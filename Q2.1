@@ -1,0 +1,98 @@
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+
+class Car:
+    # defining parameters
+    def __init__(self, length=2.3, velocity=5, disturbance=0, x=0, y=0, theta=0):
+        self.length = length
+        self.velocity = velocity
+        self.x = x
+        self.y = y
+        self.theta = theta
+        self.disturbance = disturbance
+
+    def move(self, steering_angle_rad, dt):
+        # simulate the motion of the car from t=0 to t=0+dt
+        # starting from z_initial
+        def system_dynamics(t, z):
+
+            θ = z[2]
+            return [self.velocity * np.cos(θ),
+                    self.velocity * np.sin(θ),
+                    self.velocity * np.tan(steering_angle_rad+self.disturbance) / self.length]
+
+        # solve the IVP:
+        z_initial = [self.x, self.y, self.theta]
+        solution = solve_ivp(system_dynamics,
+                             [0, dt],
+                             z_initial)
+        self.x = solution.y[0][-1]  # x trajectory last element
+        self.y = solution.y[1][-1]  # y trajectory last element
+        self.theta = solution.y[2][-1]
+
+
+# PController uses kp and ts to control system
+class PController:
+    def __init__(self, kp, ts):
+        self.kp = kp
+        self.ts = ts
+
+    def control(self, y, y_set_point=0):
+        error = y_set_point - y  # calculates error
+        p_control = self.kp * error  # steering is proportional to error, kp varies sensitivity
+        return p_control
+
+
+# setting conditions
+final_t = 50
+initial_x = 0
+initial_y = 0.4
+initial_theta = 0 * np.pi / 180
+rate_of_sample = 40
+add_disturbance = 1 * np.pi / 180
+sampling_time = 1 / rate_of_sample
+ticks = rate_of_sample*final_t
+
+# code for kp=0.06
+# stores x and y values in black box
+car1 = Car(x=initial_x, y=initial_y, disturbance=add_disturbance, theta=initial_theta)
+controller = PController(kp=0.06, ts=sampling_time)
+black_box_x = np.array([car1.x])
+black_box_y = np.array([car1.y])
+for k in range(ticks):
+    p_control = controller.control(car1.y)
+    car1.move(p_control, sampling_time)
+    black_box_x = np.vstack((black_box_x, [car1.x]))
+    black_box_y = np.vstack((black_box_y, [car1.y]))
+
+car2 = Car(x=initial_x, y=initial_y, disturbance=add_disturbance, theta=initial_theta)
+controller = PController(kp=0.2, ts=sampling_time)
+black_box_x2 = np.array([car2.x])
+black_box_y2 = np.array([car2.y])
+for k in range(ticks):
+    p_control = controller.control(car2.y)
+    car2.move(p_control, sampling_time)
+    black_box_x2 = np.vstack((black_box_x2, [car2.x]))
+    black_box_y2 = np.vstack((black_box_y2, [car2.y]))
+
+car3 = Car(x=initial_x, y=initial_y, disturbance=add_disturbance, theta=initial_theta)
+controller = PController(kp=0.4, ts=sampling_time)
+black_box_x3 = np.array([car3.x])
+black_box_y3 = np.array([car3.y])
+for k in range(ticks):
+    p_control = controller.control(car3.y)
+    car3.move(p_control, sampling_time)
+    black_box_x3 = np.vstack((black_box_x3, [car3.x]))
+    black_box_y3 = np.vstack((black_box_y3, [car3.y]))
+
+# plotting x and y trajectories for different values of kp
+plt.plot(black_box_x, black_box_y, label="K$_p$ = 0.06)")
+plt.plot(black_box_x2, black_box_y2, label="K$_p$ = 0.2)")
+plt.plot(black_box_x3, black_box_y3, label="K$_p$ = 0.4)")
+plt.grid()
+plt.xlabel("position, x (m)")
+plt.ylabel("position, y (m)")
+plt.legend()
+plt.show()
