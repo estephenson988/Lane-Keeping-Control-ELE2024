@@ -1,0 +1,90 @@
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+
+class Car:
+    # defining parameters
+    def __init__(self, length=2.3, velocity=5, disturbance=0, x=0, y=0, theta=0):
+        self.length = length
+        self.velocity = velocity
+        self.x = x
+        self.y = y
+        self.theta = theta
+        self.disturbance = disturbance
+
+    def move(self, steering_angle_rad, dt):
+        # simulate the motion of the car from t=0 to t=0+dt
+        # starting from z_initial
+        def system_dynamics(t, z):
+
+            θ = z[2]
+            return [self.velocity * np.cos(θ),
+                    self.velocity * np.sin(θ),
+                    self.velocity * np.tan(steering_angle_rad+self.disturbance) / self.length]
+
+        # next, we need to solve the IVP:
+        z_initial = [self.x, self.y, self.theta]
+        solution = solve_ivp(system_dynamics,
+                             [0, dt],
+                             z_initial)
+        self.x = solution.y[0][-1]
+        self.y = solution.y[1][-1]
+        self.theta = solution.y[2][-1]
+
+
+class PIDController:
+    def __init__(self, kp, kd, ki, ts):
+        self.kp = kp
+        self.kd = kd / ts
+        self.ki = ki*ts
+        self.ts = ts
+        self.error_previous = None
+        self.sum_errors = 0.0
+        self.pid_control = 0
+
+    def control(self, y, y_set_point=0):
+        error = y_set_point - y
+        pid_control = self.kp * error
+
+        if self.error_previous is not None:
+            pid_control += self.kd * (error - self.error_previous)
+
+        pid_control += self.ki * self.sum_errors
+        self.error_previous = error
+        self.sum_errors += error
+        self.pid_control = pid_control
+        return pid_control
+
+final_t = 50
+initial_x = 0
+initial_y = 0.3
+initial_theta = 0 * np.pi / 180
+rate_of_sample = 40
+add_disturbance = 1 * np.pi / 180
+sampling_time = 1 / rate_of_sample
+ticks = rate_of_sample*final_t
+
+
+car1 = Car(x=initial_x, y=initial_y, disturbance=add_disturbance, theta=initial_theta)
+controller = PIDController(kp=0.9, kd=0.5, ki=0.1, ts=sampling_time)
+black_box_x = np.array([car1.x])
+black_box_y = np.array([car1.y])
+# find steering of the system using pid control
+steering = np.array([controller.pid_control])
+for k in range(ticks):
+    pid_control = controller.control(car1.y)
+    car1.move(pid_control, sampling_time)
+    black_box_x = np.vstack((black_box_x, [car1.x]))
+    black_box_y = np.vstack((black_box_y, [car1.y]))
+    # stores steering
+    steering = np.vstack((steering, [controller.pid_control]))
+
+# using ticks+1 means times can appear on x axis
+t_span = sampling_time * np.arange(ticks+1)
+plt.plot(t_span, steering)
+plt.grid()
+plt.xlabel("time(s)")
+plt.ylabel("u(t)")
+plt.show()
+
