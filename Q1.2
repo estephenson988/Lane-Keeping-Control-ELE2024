@@ -1,0 +1,41 @@
+# x' = v * cos(θ)             x: x-coordinate of the car,   v: velocity
+# y' = v * sin(θ)             y: y-coordinate
+# θ' = v * tan(u) / L         θ: orientation of the car
+#                             u: steering wheel angle
+#                             L: axle-to-axle length
+# Define: z = (x, y, θ)  <--- state
+#         u              <--- input
+import numpy as np
+from scipy.integrate import solve_ivp  # solve IVPs (initial value problem)
+# IVP = diff. equation [z' = f(z) ] + initial condition [z(0) = z0]
+import matplotlib.pyplot as plt
+v = 5  # setting initial conditions
+L = 2.3
+u = -2 * np.pi / 180
+
+
+def system_dynamics(t, z):
+    # f(t, z)
+    theta = z[2]  # [2] is θ
+    return [v * np.cos(theta),
+            v * np.sin(theta),
+            v * np.tan(u) / L]
+
+
+num_points = 100
+t_final = 2  # simulation lasting two seconds
+z_initial_condition = [0, 30, 5 * np.pi / 180]  # setting x=0, y=30 and θ=5degrees in radians
+# solving using system dynamics, time, initial conditions
+solution = solve_ivp(system_dynamics,
+                     [0, t_final],
+                     z_initial_condition,
+                     t_eval=np.linspace(0, t_final, num_points))
+
+x_solution = solution.y[0]
+y_solution = solution.y[1]
+theta_solution = solution.y[2]
+times = solution.t
+plt.plot(x_solution, y_solution)  # plotting (x,y) trajectory
+plt.xlabel("x(t)")
+plt.ylabel("y(t)")
+plt.show()
